@@ -10,13 +10,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import android.app.ActivityManager.AppTask
+import androidx.compose.foundation.Image
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import com.example.triqui.logic.Difficulty
 import com.example.triqui.logic.Player
+import com.example.triqui.R
 
 @Composable
 fun GameScreen(viewModel: GameViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val soundPlayer = remember { SoundPlayer(context) }
+
+    DisposableEffect(Unit) {
+        onDispose { soundPlayer.release() }
+    }
+
+    LaunchedEffect(state.moveCount) {
+        if (state.moveCount > 0) {
+            state.lastMovedBy?.let { soundPlayer.playMove(it) }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -42,6 +57,7 @@ fun GameScreen(viewModel: GameViewModel = viewModel()) {
         Spacer(Modifier.height(16.dp))
         Button(onClick = viewModel::onResetClicked) {Text("Reiniciar")}
     }
+
 }
 
 @Composable
@@ -64,6 +80,7 @@ fun DifficultySelector(selected: Difficulty, onSelect: (Difficulty) -> Unit) {
             ) {
                 Text(difficulty.label)
             }
+
         }
     }
 }
@@ -78,6 +95,19 @@ fun Cell(mark: Player?, onClick: () -> Unit) {
             .clickable(enabled = mark == null) { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(text = mark?.name ?: "", style = MaterialTheme.typography.headlineMedium)
+        val painter = when (mark) {
+            Player.X -> painterResource(id = R.drawable.x)
+            Player.O -> painterResource(id = R.drawable.circle)
+            null -> null
+        }
+        painter?.let {
+            Image(
+                painter = it,
+                contentDescription = mark?.name,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            )
+        }
     }
 }
