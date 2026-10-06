@@ -1,21 +1,26 @@
 package com.example.triqui.ui
 
+import android.content.res.Configuration
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.Image
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.triqui.R
+import com.example.triqui.data.ScoreData
 import com.example.triqui.logic.Difficulty
 import com.example.triqui.logic.Player
-import com.example.triqui.R
 
 @Composable
 fun GameScreen(viewModel: GameViewModel = viewModel()) {
@@ -33,31 +38,118 @@ fun GameScreen(viewModel: GameViewModel = viewModel()) {
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = state.statusText, style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(16.dp))
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        DifficultySelector(
-            selected = state.difficulty,
-            onSelect = viewModel::onDifficultySelected
-        )
+    if (isLandscape) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Board(
+                cells = state.cells,
+                onCellClick = viewModel::onCellClicked,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
 
-        for (row in 0..2) {
-            Row {
-                for (col in 0..2) {
-                    val index = row * 3 + col
-                    Cell(mark = state.cells[index]) { viewModel.onCellClicked(index) }
+            Spacer(Modifier.width(24.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = state.statusText, style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(8.dp))
+                ScoreBoard(score = state.score)
+                Spacer(Modifier.height(16.dp))
+                DifficultySelector(
+                    selected = state.difficulty,
+                    onSelect = viewModel::onDifficultySelected
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = viewModel::onResetClicked) { Text("Reiniciar") }
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = state.statusText, style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(16.dp))
+            ScoreBoard(score = state.score)
+            Spacer(Modifier.height(16.dp))
+
+            DifficultySelector(
+                selected = state.difficulty,
+                onSelect = viewModel::onDifficultySelected
+            )
+            Spacer(Modifier.height(16.dp))
+
+            Board(
+                cells = state.cells,
+                onCellClick = viewModel::onCellClicked,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = viewModel::onResetClicked) { Text("Reiniciar") }
+        }
+    }
+}
+
+@Composable
+fun Board(
+    cells: List<Player?>,
+    onCellClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
+        val boardSize = minOf(maxWidth, maxHeight)
+        val cellSize = boardSize / 3
+
+        Column(modifier = Modifier.size(boardSize)) {
+            for (row in 0..2) {
+                Row {
+                    for (col in 0..2) {
+                        val index = row * 3 + col
+                        Cell(
+                            mark = cells[index],
+                            size = cellSize,
+                            onClick = { onCellClick(index) }
+                        )
+                    }
                 }
             }
         }
-
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = viewModel::onResetClicked) {Text("Reiniciar")}
     }
+}
 
+@Composable
+fun ScoreBoard(score: ScoreData, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            ScoreItem(label = "Tú", value = score.humanWins)
+        }
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            ScoreItem(label = "Empates", value = score.ties)
+        }
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            ScoreItem(label = "Computador", value = score.computerWins)
+        }
+    }
+}
+
+@Composable
+fun ScoreItem(label: String, value: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value.toString(), style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
+    }
 }
 
 @Composable
@@ -80,16 +172,15 @@ fun DifficultySelector(selected: Difficulty, onSelect: (Difficulty) -> Unit) {
             ) {
                 Text(difficulty.label)
             }
-
         }
     }
 }
 
 @Composable
-fun Cell(mark: Player?, onClick: () -> Unit) {
+fun Cell(mark: Player?, size: Dp, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(80.dp)
+            .size(size)
             .padding(4.dp)
             .border(1.dp, Color.Black)
             .clickable(enabled = mark == null) { onClick() },

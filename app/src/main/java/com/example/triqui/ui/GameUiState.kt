@@ -1,7 +1,10 @@
 package com.example.triqui.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.triqui.data.ScoreData
+import com.example.triqui.data.ScoreRepository
 import com.example.triqui.logic.ComputerPlayer
 import com.example.triqui.logic.Difficulty
 import com.example.triqui.logic.GameResult
@@ -20,18 +23,30 @@ data class GameUiState(
     val statusText: String = "Turno de X",
     val difficulty: Difficulty = Difficulty.MEDIUM,
     val moveCount: Int = 0,
-    val lastMovedBy: Player? = null
+    val lastMovedBy: Player? = null,
+    var score: ScoreData = ScoreData()
 )
 
-class GameViewModel : ViewModel() {
+class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val game = TicTacToeGame()
     private val human = Player.X
     private var difficulty = Difficulty.MEDIUM
     private var computer = ComputerPlayer(self = Player.O, strategy = difficulty.toStrategy())
     private var moveCount = 0
     private var lastMovedBy: Player? = null
+    private var score = ScoreData()
+    private val repository = ScoreRepository(application)
     private val _uiState = MutableStateFlow(toUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.scoreFlow.collect { loadedScore ->
+                score = loadedScore
+                _uiState.value = toUiState()
+            }
+        }
+    }
 
     fun onCellClicked(index: Int) {
         if (game.currentPlayer != human) return
@@ -40,6 +55,7 @@ class GameViewModel : ViewModel() {
         lastMovedBy = human
         moveCount++
         _uiState.value = toUiState()
+        handleResultIfFinished()
 
         if (game.result == GameResult.InProgress && game.currentPlayer == computer.self) {
             makeComputerMove()
@@ -64,6 +80,19 @@ class GameViewModel : ViewModel() {
                 lastMovedBy = computer.self
                 moveCount++
                 _uiState.value = toUiState()
+                handleResultIfFinished()
+            }
+        }
+    }
+
+    private fun handleResultIfFinished() {
+        viewModelScope.launch {
+            when (val r = game.result) {
+                is GameResult.Winner ->
+                    if (r.player == human) repository.incrementHumanWins()
+                    else repository.incrementComputerWins()
+                is GameResult.Draw -> repository.incrementTies()
+                is GameResult.InProgress -> {}
             }
         }
     }
@@ -89,7 +118,8 @@ class GameViewModel : ViewModel() {
             statusText = status,
             difficulty = difficulty,
             moveCount = moveCount,
-            lastMovedBy = lastMovedBy
+            lastMovedBy = lastMovedBy,
+            score = score
         )
     }
 }
